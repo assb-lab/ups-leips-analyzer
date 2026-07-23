@@ -34,3 +34,7 @@ sample/
 *.njsproj
 *.sln
 *.sw?
+
+# AI agent
+.antigravitycli
+

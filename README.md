@@ -54,4 +54,4 @@ podman compose up
 
 ## License
 
-MIT License. Copyright (c) 2026 ks25026.
+MIT License. Copyright (c) 2026 assb-lab.
