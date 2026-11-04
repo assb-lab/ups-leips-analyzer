@@ -1,4 +1,4 @@
-import type { SpectrumDataset, SpectrumKind } from "../domain/types";
+import type { Point, SpectrumDataset, SpectrumKind } from "../domain/types";
 
 export interface ParseMultiPakOptions {
   sourceName: string;
@@ -24,21 +24,14 @@ export function parseMultiPakCsv(text: string, options: ParseMultiPakOptions): S
     .slice(5)
     .map(splitCsvLine)
     .filter((row) => row.length >= 2);
-  const columns = transposeNumericRows(numericRows);
-  if (columns.length < 2) {
+  const table = parseNumericRows(numericRows);
+  if (table.width < 2) {
     throw new Error("MultiPak CSV must contain one x column and at least one y column.");
   }
+  const yColumns = pointsByYColumn(table);
 
-  const xColumn = columns[0];
   const datasets: SpectrumDataset[] = [];
-  for (let yIndex = 1; yIndex < columns.length; yIndex += 1) {
-    const yColumn = columns[yIndex];
-    const points = xColumn
-      .map((x, index) => ({ x, y: yColumn[index] }))
-      .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
-    if (points.length === 0) {
-      continue;
-    }
+  for (const { columnIndex: yIndex, points } of yColumns) {
     const seriesLabel = header[yIndex] && header[yIndex] !== "" ? header[yIndex] : `${yIndex}`;
     const kind =
       options.forcedKind ??
@@ -55,7 +48,7 @@ export function parseMultiPakCsv(text: string, options: ParseMultiPakOptions): S
     datasets.push({
       id: createDatasetId(options.sourceName, yIndex),
       name:
-        columns.length > 2
+        yColumns.length > 1
           ? `${stripExtension(options.sourceName)} #${seriesLabel}`
           : stripExtension(options.sourceName),
       sourceName: options.sourceName,
@@ -69,6 +62,7 @@ export function parseMultiPakCsv(text: string, options: ParseMultiPakOptions): S
         kind: kindText,
         series: metadataRows[3] ?? "",
         columns: metadataRows[4] ?? "",
+        columnIndex: String(yIndex),
         appliedVoltage: String(voltage.value),
         appliedVoltageSource: voltage.source,
       },
@@ -195,21 +189,49 @@ function splitCsvLine(line: string): string[] {
   return line.split(",").map((cell) => cell.trim());
 }
 
-function transposeNumericRows(rows: string[][]): number[][] {
-  const width = Math.max(...rows.map((row) => row.length));
-  const columns = Array.from({ length: width }, () => [] as number[]);
+interface NumericTable {
+  rows: number[][];
+  width: number;
+}
+
+/**
+ * Parses the numeric block while keeping every cell at its original column, so that one
+ * missing value never shifts later rows. Reading stops at a `0,0` terminator row.
+ */
+function parseNumericRows(rows: string[][]): NumericTable {
+  const parsed: number[][] = [];
+  let width = 0;
   for (const row of rows) {
     const values = row.map((cell) => Number.parseFloat(cell));
     if (values.length >= 2 && values[0] === 0 && values[1] === 0) {
       break;
     }
-    values.forEach((value, index) => {
-      if (Number.isFinite(value)) {
-        columns[index].push(value);
-      }
-    });
+    parsed.push(values);
+    width = Math.max(width, values.length);
   }
-  return columns.filter((column) => column.length > 0);
+  return { rows: parsed, width };
+}
+
+/**
+ * Builds one point list per y column from the rows where both x and that y are numeric.
+ * Columns without any point are skipped, but the rest keep their original column index.
+ */
+function pointsByYColumn(table: NumericTable): { columnIndex: number; points: Point[] }[] {
+  const yColumns: { columnIndex: number; points: Point[] }[] = [];
+  for (let columnIndex = 1; columnIndex < table.width; columnIndex += 1) {
+    const points: Point[] = [];
+    for (const row of table.rows) {
+      const x = row[0];
+      const y = row[columnIndex];
+      if (x !== undefined && y !== undefined && Number.isFinite(x) && Number.isFinite(y)) {
+        points.push({ x, y });
+      }
+    }
+    if (points.length > 0) {
+      yColumns.push({ columnIndex, points });
+    }
+  }
+  return yColumns;
 }
 
 function createDatasetId(sourceName: string, yIndex: number): string {

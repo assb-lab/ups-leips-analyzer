@@ -109,4 +109,67 @@ file#
       ),
     ).toThrow("one x column");
   });
+
+  test("drops an incomplete row as a whole instead of shifting later points", () => {
+    const [dataset] = parseMultiPakCsv(
+      ["1", "d", "VB", "1,1", "file#,2", "3,30", "2,", "1,10"].join("\n"),
+      { sourceName: "ups_vb.csv" },
+    );
+
+    expect(dataset?.points).toEqual([
+      { x: 3, y: 30 },
+      { x: 1, y: 10 },
+    ]);
+  });
+
+  test("keeps columns aligned per row when only one y column has a gap", () => {
+    const datasets = parseMultiPakCsv(
+      ["1", "d", "UPS IP", "1,1", "file#,22,24", "3,30,300", "2,,200", "1,10,100"].join("\n"),
+      { sourceName: "ups_ip.csv" },
+    );
+
+    expect(datasets.map((dataset) => dataset.points)).toEqual([
+      [
+        { x: 3, y: 30 },
+        { x: 1, y: 10 },
+      ],
+      [
+        { x: 3, y: 300 },
+        { x: 2, y: 200 },
+        { x: 1, y: 100 },
+      ],
+    ]);
+  });
+
+  test("keeps the original column identity when an earlier y column is empty", () => {
+    const datasets = parseMultiPakCsv(
+      ["1", "d", "UPS IP", "1,1", "file#,IP-5V,IP+5V", "3,,300", "2,,200", "1,,100"].join("\n"),
+      { sourceName: "ups_ip.csv" },
+    );
+
+    expect(datasets).toHaveLength(1);
+    expect(datasets[0]?.id).toBe("ups-ip-2");
+    expect(datasets[0]?.metadata.columnIndex).toBe("2");
+    expect(datasets[0]?.metadata.appliedVoltage).toBe("5");
+    expect(datasets[0]?.name).toBe("ups_ip");
+    expect(datasets[0]?.points).toHaveLength(3);
+  });
+
+  test("records the original column index for every dataset", () => {
+    const datasets = parseMultiPakCsv(CSV, { sourceName: "ip.csv" });
+    expect(datasets.map((dataset) => dataset.metadata.columnIndex)).toEqual(["1", "2"]);
+  });
+
+  test("reads a numeric block too long to spread into function arguments", () => {
+    const rowCount = 500_000;
+    const numericRows = Array.from({ length: rowCount }, (_, index) => `${index + 1},${index}`);
+    const [dataset] = parseMultiPakCsv(
+      ["1", "d", "VB", "1,1", "file#,2", ...numericRows].join("\n"),
+      {
+        sourceName: "ups_vb.csv",
+      },
+    );
+
+    expect(dataset?.points).toHaveLength(rowCount);
+  });
 });
