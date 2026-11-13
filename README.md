@@ -2,6 +2,8 @@
 
 UPS/LEIPSスペクトルを読み込み、VBM、cut-off、IP、LEET(der)ピーク、真空準位、EA、UPS-LEIPSバンド図をブラウザ内で解析するVite+ / Reactアプリです。
 
+[ブラウザでアプリを開く](https://assb-lab.github.io/ups-leips-analyzer/)
+
 詳細仕様は `docs/`、実装ログは `.steering/` を参照してください。
 
 ## 開発

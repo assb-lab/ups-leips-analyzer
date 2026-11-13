@@ -36,3 +36,7 @@ pnpm binary:build:macos-app:arm64
 10. macOS `.app` をFinderから開くとローカルサーバーが起動し、既定ブラウザで解析画面が開く。ブラウザページを閉じるとheartbeat停止によりサーバーも自動終了する。
 11. Windows `.exe` はfavicon resourceを埋め込んで生成される。
 12. Caddyコンテナを `podman compose up` で起動し、`http://127.0.0.1:4173/` が返る。
+
+## GitHub Pages
+
+`main` へのpush時にGitHub Actionsで静的サイトをビルドし、GitHub Pagesへデプロイする。アセットは相対パスで出力し、リポジトリのサブパスとGoバイナリのルート配信の両方に対応する。公開先は https://assb-lab.github.io/ups-leips-analyzer/ 。
